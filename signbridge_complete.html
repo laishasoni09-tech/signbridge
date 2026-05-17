@@ -1,0 +1,1869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SignBridge — Workplace Accessibility Command Center</title>
+ 
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+ 
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+ 
+  <style>
+    :root {
+      --bg-deep:       #0a0a0f;
+      --bg-surface:    #0f0f1a;
+      --bg-card:       rgba(255,255,255,0.04);
+      --bg-card-hover: rgba(255,255,255,0.07);
+      --border:        rgba(255,255,255,0.08);
+      --border-bright: rgba(255,255,255,0.15);
+ 
+      /* Purple gradient palette (inspired by image 2) */
+      --purple-1:      #7c3aed;
+      --purple-2:      #a855f7;
+      --purple-3:      #c084fc;
+      --rose:          #f43f5e;
+      --amber:         #f59e0b;
+      --emerald:       #10b981;
+      --sky:           #38bdf8;
+ 
+      /* Bubble accent colors (inspired by image 1) */
+      --bubble-gold:   #c8922a;
+      --bubble-blue:   #1e3a5f;
+ 
+      --text-primary:  #f8f8ff;
+      --text-secondary:#a1a1c4;
+      --text-muted:    #52526e;
+ 
+      --font-display:  'Syne', sans-serif;
+      --font-mono:     'DM Mono', monospace;
+ 
+      --radius-sm:     6px;
+      --radius-md:     12px;
+      --radius-lg:     20px;
+      --radius-xl:     28px;
+    }
+ 
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+ 
+    html, body {
+      height: 100%;
+      background: var(--bg-deep);
+      color: var(--text-primary);
+      font-family: var(--font-display);
+      overflow: hidden;
+    }
+ 
+    /* ── BACKGROUND ── */
+    #bg-canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+    }
+ 
+    /* Animated mesh gradient like image 2 */
+    .bg-gradient {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse 80% 60% at 70% 50%, rgba(124,58,237,0.18) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 80% at 20% 30%, rgba(168,85,247,0.12) 0%, transparent 55%),
+        radial-gradient(ellipse 50% 50% at 80% 80%, rgba(244,63,94,0.08) 0%, transparent 50%),
+        radial-gradient(ellipse 70% 40% at 10% 80%, rgba(56,189,248,0.06) 0%, transparent 50%);
+      animation: meshShift 12s ease-in-out infinite alternate;
+    }
+ 
+    @keyframes meshShift {
+      0%   { filter: hue-rotate(0deg); }
+      100% { filter: hue-rotate(20deg); }
+    }
+ 
+    /* ── BUBBLES (from image 1) ── */
+    .bubble {
+      position: fixed;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 0;
+    }
+ 
+    .bubble-1 {
+      width: 520px; height: 520px;
+      right: -120px; bottom: -120px;
+      background: radial-gradient(circle at 35% 35%,
+        rgba(200,146,42,0.55) 0%,
+        rgba(200,146,42,0.3) 25%,
+        rgba(30,58,95,0.4) 55%,
+        rgba(10,10,20,0.8) 80%,
+        transparent 100%);
+      box-shadow:
+        inset -40px -40px 80px rgba(200,146,42,0.3),
+        inset 20px 20px 60px rgba(30,58,95,0.4),
+        0 0 120px rgba(200,146,42,0.15);
+      animation: bubbleFloat1 8s ease-in-out infinite;
+    }
+ 
+    .bubble-2 {
+      width: 280px; height: 280px;
+      left: -60px; top: 30%;
+      background: radial-gradient(circle at 60% 40%,
+        rgba(124,58,237,0.4) 0%,
+        rgba(168,85,247,0.2) 40%,
+        rgba(10,10,20,0.6) 75%,
+        transparent 100%);
+      box-shadow:
+        inset -20px -20px 40px rgba(168,85,247,0.3),
+        0 0 60px rgba(124,58,237,0.1);
+      animation: bubbleFloat2 11s ease-in-out infinite;
+    }
+ 
+    .bubble-3 {
+      width: 180px; height: 180px;
+      right: 380px; top: -40px;
+      background: radial-gradient(circle at 40% 60%,
+        rgba(56,189,248,0.3) 0%,
+        rgba(56,189,248,0.1) 50%,
+        transparent 80%);
+      box-shadow:
+        inset -10px -10px 30px rgba(56,189,248,0.2),
+        0 0 40px rgba(56,189,248,0.08);
+      animation: bubbleFloat3 9s ease-in-out infinite reverse;
+    }
+ 
+    @keyframes bubbleFloat1 {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      33%       { transform: translate(-20px, -30px) scale(1.02); }
+      66%       { transform: translate(10px, -15px) scale(0.98); }
+    }
+ 
+    @keyframes bubbleFloat2 {
+      0%, 100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+      50%       { transform: translate(15px, 20px) scale(1.05) rotate(3deg); }
+    }
+ 
+    @keyframes bubbleFloat3 {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      50%       { transform: translate(-10px, 15px) scale(1.08); }
+    }
+ 
+    /* ── GRAIN OVERLAY ── */
+    body::after {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 9999;
+      opacity: 0.6;
+    }
+ 
+    /* ── LAYOUT ── */
+    #app {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-rows: 60px 1fr;
+      grid-template-columns: 1fr 360px;
+      grid-template-areas:
+        "header header"
+        "main   sidebar";
+      height: 100vh;
+      gap: 0;
+    }
+ 
+    /* ── HEADER ── */
+    #header {
+      grid-area: header;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      background: rgba(15,15,26,0.7);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      z-index: 10;
+    }
+ 
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+ 
+    .logo-mark {
+      width: 34px; height: 34px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--purple-1), var(--purple-3));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+      box-shadow: 0 4px 16px rgba(124,58,237,0.4);
+      animation: logoGlow 3s ease-in-out infinite;
+    }
+ 
+    @keyframes logoGlow {
+      0%, 100% { box-shadow: 0 4px 16px rgba(124,58,237,0.4); }
+      50%       { box-shadow: 0 4px 24px rgba(168,85,247,0.6); }
+    }
+ 
+    .logo h1 {
+      font-size: 17px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      color: var(--text-primary);
+    }
+ 
+    .logo h1 span {
+      background: linear-gradient(90deg, var(--purple-2), var(--purple-3));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+ 
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+ 
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 40px;
+      padding: 5px 12px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-secondary);
+      letter-spacing: 0.04em;
+      backdrop-filter: blur(10px);
+    }
+ 
+    .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      flex-shrink: 0;
+      transition: background 0.3s, box-shadow 0.3s;
+    }
+ 
+    .dot.active {
+      background: var(--emerald);
+      box-shadow: 0 0 8px var(--emerald);
+      animation: blink 1.6s ease-in-out infinite;
+    }
+ 
+    .dot.warn { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+    .dot.error { background: var(--rose); box-shadow: 0 0 8px var(--rose); }
+ 
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.35} }
+ 
+    #sys-clock {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-muted);
+      letter-spacing: 0.06em;
+    }
+ 
+    /* ── MAIN PANEL ── */
+    #main {
+      grid-area: main;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding: 16px;
+      overflow: hidden;
+    }
+ 
+    /* Camera frame */
+    #camera-wrapper {
+      position: relative;
+      flex: 1;
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(10px);
+    }
+ 
+    #input-video {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1);
+    }
+ 
+    #output-canvas {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      transform: scaleX(-1);
+    }
+ 
+    /* Corner brackets */
+    .frame-corner {
+      position: absolute;
+      width: 20px; height: 20px;
+      border-color: rgba(168,85,247,0.6);
+      border-style: solid;
+      z-index: 2;
+      border-radius: 2px;
+    }
+    .frame-corner.tl { top: 14px; left: 14px; border-width: 2px 0 0 2px; border-top-left-radius: 6px; }
+    .frame-corner.tr { top: 14px; right: 14px; border-width: 2px 2px 0 0; border-top-right-radius: 6px; }
+    .frame-corner.bl { bottom: 14px; left: 14px; border-width: 0 0 2px 2px; border-bottom-left-radius: 6px; }
+    .frame-corner.br { bottom: 14px; right: 14px; border-width: 0 2px 2px 0; border-bottom-right-radius: 6px; }
+ 
+    #rec-badge {
+      position: absolute;
+      top: 16px; left: 50%;
+      transform: translateX(-50%);
+      background: rgba(244,63,94,0.15);
+      border: 1px solid rgba(244,63,94,0.3);
+      border-radius: 40px;
+      padding: 4px 12px;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      color: var(--rose);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      z-index: 2;
+      opacity: 0;
+      transition: opacity 0.3s;
+      backdrop-filter: blur(8px);
+    }
+ 
+    #rec-badge.live { opacity: 1; }
+ 
+    #rec-badge::before {
+      content: '';
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: var(--rose);
+      animation: blink 1s infinite;
+    }
+ 
+    /* Detection overlay — floating glass card at bottom */
+    #detection-overlay {
+      position: absolute;
+      bottom: 20px; left: 50%;
+      transform: translateX(-50%);
+      z-index: 3;
+      text-align: center;
+      pointer-events: none;
+      background: rgba(15,15,26,0.6);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border-bright);
+      border-radius: var(--radius-lg);
+      padding: 14px 32px 12px;
+      min-width: 220px;
+    }
+ 
+    #current-sign {
+      font-size: clamp(24px, 3.5vw, 48px);
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      background: linear-gradient(135deg, var(--purple-3), #e879f9, var(--sky));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1;
+      min-height: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+ 
+    #current-sign.emergency {
+      background: linear-gradient(135deg, var(--rose), #fb7185);
+      -webkit-background-clip: text;
+      background-clip: text;
+    }
+ 
+    #current-sign.idle {
+      background: linear-gradient(135deg, var(--text-muted), var(--text-secondary));
+      -webkit-background-clip: text;
+      background-clip: text;
+    }
+ 
+    #confidence-bar-wrap {
+      margin-top: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: center;
+    }
+ 
+    #conf-label {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-muted);
+      letter-spacing: 0.1em;
+    }
+ 
+    #confidence-bar {
+      width: 100px; height: 2px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+ 
+    #confidence-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--purple-1), var(--purple-3), #e879f9);
+      border-radius: 2px;
+      transition: width 0.25s ease;
+    }
+ 
+    #conf-pct {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-secondary);
+    }
+ 
+    /* ── METRIC STRIP ── */
+    #metric-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      flex-shrink: 0;
+    }
+ 
+    .metric-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 12px 16px;
+      backdrop-filter: blur(10px);
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.3s, background 0.3s;
+    }
+ 
+    .metric-card:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--border-bright);
+    }
+ 
+    .metric-card::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--purple-2), transparent);
+      opacity: 0.4;
+    }
+ 
+    .metric-card.green::after { background: linear-gradient(90deg, transparent, var(--emerald), transparent); }
+    .metric-card.amber::after { background: linear-gradient(90deg, transparent, var(--amber), transparent); }
+    .metric-card.rose::after  { background: linear-gradient(90deg, transparent, var(--rose), transparent); }
+ 
+    .metric-label {
+      font-family: var(--font-mono);
+      font-size: 8px;
+      letter-spacing: 0.14em;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+ 
+    .metric-value {
+      font-family: var(--font-mono);
+      font-size: 22px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+ 
+    .metric-value.purple { background: linear-gradient(90deg, var(--purple-2), var(--purple-3)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .metric-value.green  { color: var(--emerald); }
+    .metric-value.amber  { color: var(--amber); }
+ 
+    /* ── SIDEBAR ── */
+    #sidebar {
+      grid-area: sidebar;
+      display: flex;
+      flex-direction: column;
+      background: rgba(15,15,26,0.75);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border-left: 1px solid var(--border);
+      overflow: hidden;
+    }
+ 
+    .sidebar-section {
+      border-bottom: 1px solid var(--border);
+      padding: 14px 16px;
+    }
+ 
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+ 
+    .section-title {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+ 
+    .section-title::before {
+      content: '';
+      display: inline-block;
+      width: 14px; height: 1px;
+      background: linear-gradient(90deg, var(--purple-2), transparent);
+    }
+ 
+    /* Gesture detail card */
+    #gesture-detail {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 14px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.3s;
+    }
+ 
+    #gesture-detail.active {
+      border-color: rgba(168,85,247,0.35);
+      background: rgba(124,58,237,0.06);
+    }
+ 
+    #gesture-detail::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(168,85,247,0.5), transparent);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+ 
+    #gesture-detail.active::before { opacity: 1; }
+ 
+    #gd-sign {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      background: linear-gradient(90deg, var(--purple-2), var(--purple-3));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 5px;
+    }
+ 
+    #gd-desc {
+      font-size: 10px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      font-family: var(--font-mono);
+    }
+ 
+    #gd-conf {
+      margin-top: 8px;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-muted);
+      letter-spacing: 0.06em;
+    }
+ 
+    /* Finger state pills */
+    #finger-states {
+      display: flex;
+      gap: 5px;
+      margin-top: 10px;
+    }
+ 
+    .finger-pill {
+      flex: 1;
+      height: 26px;
+      border-radius: var(--radius-sm);
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 7px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      transition: all 0.15s;
+    }
+ 
+    .finger-pill.extended {
+      background: rgba(168,85,247,0.12);
+      border-color: rgba(168,85,247,0.4);
+      color: var(--purple-3);
+      box-shadow: 0 0 8px rgba(168,85,247,0.1);
+    }
+ 
+    /* Vocab grid */
+    #vocab-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 4px;
+    }
+ 
+    .vocab-chip {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 5px 3px;
+      text-align: center;
+      font-family: var(--font-mono);
+      font-size: 7px;
+      color: var(--text-muted);
+      letter-spacing: 0.04em;
+      transition: all 0.2s;
+      cursor: default;
+    }
+ 
+    .vocab-chip.detected {
+      background: rgba(168,85,247,0.14);
+      border-color: rgba(168,85,247,0.5);
+      color: var(--purple-3);
+      box-shadow: 0 0 10px rgba(168,85,247,0.15);
+    }
+ 
+    .vocab-chip.emergency {
+      border-color: rgba(244,63,94,0.3);
+      color: var(--rose);
+    }
+ 
+    /* History list */
+    #history-list {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 10px 16px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255,255,255,0.06) transparent;
+    }
+ 
+    #history-list::-webkit-scrollbar { width: 3px; }
+    #history-list::-webkit-scrollbar-track { background: transparent; }
+    #history-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 2px; }
+ 
+    .history-entry {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      animation: slideIn 0.2s ease;
+      transition: border-color 0.2s;
+    }
+ 
+    .history-entry:hover { border-color: var(--border-bright); }
+ 
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(10px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+ 
+    .history-entry .sign-tag {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--purple-3);
+      min-width: 80px;
+    }
+ 
+    .history-entry .conf-tag {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--emerald);
+      min-width: 34px;
+    }
+ 
+    .history-entry .time-tag {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-muted);
+      margin-left: auto;
+    }
+ 
+    .history-entry.emerg { border-color: rgba(244,63,94,0.2); }
+    .history-entry.emerg .sign-tag { color: var(--rose); }
+ 
+    /* Analytics status */
+    #analytics-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 8px;
+      color: var(--text-muted);
+      letter-spacing: 0.04em;
+    }
+ 
+    /* Controls */
+    .ctrl-row {
+      display: flex;
+      gap: 8px;
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+    }
+ 
+    .btn {
+      flex: 1;
+      padding: 9px 6px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.03);
+      color: var(--text-secondary);
+      font-family: var(--font-mono);
+      font-size: 8px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+ 
+    .btn:hover {
+      border-color: rgba(168,85,247,0.4);
+      color: var(--purple-3);
+      background: rgba(168,85,247,0.06);
+    }
+ 
+    .btn.primary {
+      border-color: rgba(168,85,247,0.35);
+      background: rgba(124,58,237,0.1);
+      color: var(--purple-3);
+    }
+ 
+    .btn.primary:hover {
+      background: rgba(124,58,237,0.2);
+      box-shadow: 0 0 16px rgba(124,58,237,0.2);
+    }
+ 
+    .btn.danger {
+      border-color: rgba(244,63,94,0.25);
+      color: rgba(244,63,94,0.7);
+    }
+ 
+    .btn.danger:hover {
+      background: rgba(244,63,94,0.08);
+      color: var(--rose);
+    }
+ 
+    /* ── TOASTS ── */
+    #toast-container {
+      position: fixed;
+      bottom: 24px; left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+    }
+ 
+    .toast {
+      background: rgba(15,15,26,0.9);
+      border: 1px solid var(--border-bright);
+      border-radius: var(--radius-md);
+      padding: 10px 20px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-primary);
+      white-space: nowrap;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      animation: toastIn 0.3s ease, toastOut 0.3s ease 2.5s forwards;
+    }
+ 
+    @keyframes toastIn  { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes toastOut { from{opacity:1} to{opacity:0;transform:translateY(-6px)} }
+ 
+    /* ── LOADING SCREEN ── */
+    #loading-screen {
+      position: fixed; inset: 0;
+      background: var(--bg-deep);
+      z-index: 500;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      transition: opacity 0.6s ease;
+    }
+ 
+    #loading-screen.hidden { opacity: 0; pointer-events: none; }
+ 
+    .load-logo {
+      font-size: 36px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+    }
+ 
+    .load-logo .a { color: var(--text-primary); }
+    .load-logo .b {
+      background: linear-gradient(90deg, var(--purple-2), var(--purple-3));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+ 
+    .load-bar-wrap {
+      width: 200px; height: 1px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+ 
+    .load-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--purple-1), var(--purple-3));
+      border-radius: 2px;
+      animation: loadProgress 3s ease forwards;
+    }
+ 
+    @keyframes loadProgress { from{width:0%} to{width:100%} }
+ 
+    #load-status {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+      letter-spacing: 0.12em;
+    }
+ 
+    /* ── CONFIG MODAL ── */
+    #config-modal {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(8px);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+ 
+    #config-modal.open { display: flex; }
+ 
+    .modal-box {
+      background: rgba(15,15,26,0.95);
+      border: 1px solid rgba(168,85,247,0.2);
+      border-radius: var(--radius-xl);
+      padding: 28px;
+      width: 460px;
+      max-width: 90vw;
+      box-shadow: 0 0 80px rgba(124,58,237,0.15), 0 24px 48px rgba(0,0,0,0.5);
+      backdrop-filter: blur(24px);
+    }
+ 
+    .modal-title {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      background: linear-gradient(90deg, var(--purple-2), var(--purple-3));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 6px;
+    }
+ 
+    .modal-sub {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+      line-height: 1.7;
+      margin-bottom: 20px;
+    }
+ 
+    .field-label {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.12em;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+    }
+ 
+    .field-input {
+      width: 100%;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      color: var(--text-primary);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      outline: none;
+      transition: border-color 0.2s;
+      margin-bottom: 16px;
+    }
+ 
+    .field-input:focus { border-color: rgba(168,85,247,0.5); }
+ 
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+ 
+    /* ── TEXT TO SIGN (TTS) MODE ── */
+    .main-panel { display: none; flex-direction: column; gap: 14px; height: 100%; }
+    .main-panel.active { display: flex; }
+    
+    .mode-switch-btn {
+      background: transparent; border: 1px solid transparent; border-radius: 6px;
+      padding: 4px 10px; font-size: 14px; cursor: pointer; transition: all 0.2s; color: var(--text-muted);
+    }
+    .mode-switch-btn:hover { background: rgba(168,85,247,0.1); border-color: rgba(168,85,247,0.3); }
+    .mode-switch-btn.active { background: rgba(168,85,247,0.2); border-color: rgba(168,85,247,0.5); color: var(--purple-3); }
+ 
+    .sidebar-view { display: none; flex-direction: column; height: 100%; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.06) transparent; }
+    .sidebar-view.active { display: flex; }
+ 
+    #dict-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding-bottom: 20px;}
+    .dict-btn { background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px; text-align: center; font-family: var(--font-mono); font-size: 10px; color: var(--text-secondary); cursor: pointer; transition: all 0.2s; }
+    .dict-btn:hover { background: rgba(168,85,247,0.1); border-color: rgba(168,85,247,0.4); color: var(--purple-3); }
+    .dict-btn.active-word { background: rgba(124,58,237,0.2); border-color: var(--purple-2); color: #fff; box-shadow: 0 0 10px rgba(168,85,247,0.3); }
+    
+    #tts-display { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); border-radius: var(--radius-xl); border: 1px solid var(--border); padding: 20px; position: relative; overflow: hidden; backdrop-filter: blur(10px); }
+    #tts-media, #tts-media-img { max-width: 100%; max-height: 100%; border-radius: var(--radius-md); display: none; }
+    #tts-placeholder { color: var(--text-muted); font-family: var(--font-mono); font-size: 13px; text-align: center; letter-spacing: 0.05em; }
+    #tts-word-label { position: absolute; bottom: 30px; font-size: 28px; font-weight: 800; letter-spacing: 0.08em; background: linear-gradient(135deg, var(--purple-3), #e879f9, var(--sky)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; display: none; text-shadow: 0 4px 16px rgba(0,0,0,0.8); }
+ 
+    /* ── RESPONSIVE ── */
+    @media (max-width: 900px) {
+      #app { grid-template-columns: 1fr 300px; }
+    }
+ 
+    @media (max-width: 700px) {
+      #app {
+        grid-template-rows: 60px 1fr auto;
+        grid-template-columns: 1fr;
+        grid-template-areas: "header" "main" "sidebar";
+        overflow-y: auto;
+      }
+      html, body { overflow: auto; }
+      #main { height: 60vh; }
+      #sidebar { border-left: none; border-top: 1px solid var(--border); height: auto; max-height: 50vh; }
+      #history-list { max-height: 180px; }
+      #metric-strip { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+ 
+<!-- Background layers -->
+<div class="bg-gradient"></div>
+<div class="bubble bubble-1"></div>
+<div class="bubble bubble-2"></div>
+<div class="bubble bubble-3"></div>
+ 
+<!-- Loading Screen -->
+<div id="loading-screen">
+  <div class="load-logo">
+    <span class="a">SIGN</span><span class="b">BRIDGE</span>
+  </div>
+  <div class="load-bar-wrap"><div class="load-bar-fill"></div></div>
+  <div id="load-status">INITIALIZING MEDIAPIPE HANDS ENGINE...</div>
+</div>
+ 
+<!-- Config Modal -->
+<div id="config-modal">
+  <div class="modal-box">
+    <div class="modal-title">Analytics Endpoint Config</div>
+    <div class="modal-sub">
+      Connect to a Google Apps Script Web App for Productivity ROI logging.<br>
+      Deploy your Sheet as: Extensions → Apps Script → Deploy → Web App (Anyone).
+    </div>
+    <div class="field-label">Apps Script Web App URL</div>
+    <input type="text" class="field-input" id="sheets-url-input"
+           placeholder="https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec" />
+    <div class="field-label">Session ID (auto-generated)</div>
+    <input type="text" class="field-input" id="session-id-input" readonly />
+    <div class="modal-actions">
+      <button class="btn" onclick="closeConfigModal()">Cancel</button>
+      <button class="btn primary" onclick="saveConfig()">Save & Connect</button>
+    </div>
+  </div>
+</div>
+ 
+<!-- Toast Container -->
+<div id="toast-container"></div>
+ 
+<!-- App Layout -->
+<div id="app">
+ 
+  <!-- HEADER -->
+  <header id="header">
+    <div class="logo">
+      <div class="logo-mark">✋</div>
+      <h1>SIGN<span>BRIDGE</span></h1>
+    </div>
+    <div class="header-right">
+      <!-- Mode Toggle -->
+      <div class="status-pill" style="padding: 3px; gap: 4px;">
+        <button class="mode-switch-btn active" id="mode-stt-btn" onclick="setMode('stt')" title="Sign to Text">📹→📝</button>
+        <button class="mode-switch-btn" id="mode-tts-btn" onclick="setMode('tts')" title="Text to Sign">📝→✋</button>
+      </div>
+      <div class="status-pill">
+        <div class="dot" id="cam-dot"></div>
+        <span id="cam-status">CAMERA INIT</span>
+      </div>
+      <div class="status-pill">
+        <div class="dot" id="mp-dot"></div>
+        <span id="mp-status">MEDIAPIPE</span>
+      </div>
+      <div class="status-pill">
+        <div class="dot" id="speech-dot"></div>
+        <span id="speech-status">SPEECH</span>
+      </div>
+      <div id="sys-clock">--:--:--</div>
+    </div>
+  </header>
+ 
+  <!-- MAIN -->
+  <main id="main">
+ 
+    <!-- Sign to Text Panel -->
+    <div id="panel-stt" class="main-panel active">
+      <div id="camera-wrapper">
+        <video id="input-video" playsinline autoplay muted></video>
+        <canvas id="output-canvas"></canvas>
+ 
+      <div class="frame-corner tl"></div>
+      <div class="frame-corner tr"></div>
+      <div class="frame-corner bl"></div>
+      <div class="frame-corner br"></div>
+ 
+      <div id="rec-badge">LIVE</div>
+ 
+      <div id="detection-overlay">
+        <div id="current-sign" class="idle">—</div>
+        <div id="confidence-bar-wrap">
+          <span id="conf-label">CONF</span>
+          <div id="confidence-bar"><div id="confidence-fill"></div></div>
+          <span id="conf-pct">0%</span>
+        </div>
+      </div>
+    </div>
+ 
+    <!-- Metric Strip -->
+    <div id="metric-strip">
+      <div class="metric-card">
+        <div class="metric-label">Total Signs</div>
+        <div class="metric-value purple" id="m-total">0</div>
+      </div>
+      <div class="metric-card green">
+        <div class="metric-label">Session Time</div>
+        <div class="metric-value green" id="m-time">00:00</div>
+      </div>
+      <div class="metric-card amber">
+        <div class="metric-label">Avg Confidence</div>
+        <div class="metric-value amber" id="m-avgconf">—</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Hands Tracked</div>
+        <div class="metric-value" id="m-hands">0</div>
+      </div>
+    </div>
+    </div>
+ 
+    <!-- Text to Sign Panel -->
+    <div id="panel-tts" class="main-panel">
+      <div id="tts-display">
+        <div id="tts-placeholder">Select a word from the sidebar to view its sign</div>
+        <video id="tts-media" autoplay loop muted playsinline></video>
+        <img id="tts-media-img" style="display:none; max-width: 100%; max-height: 100%; border-radius: var(--radius-md);" />
+        <div id="tts-word-label"></div>
+      </div>
+    </div>
+ 
+  </main>
+ 
+  <!-- SIDEBAR -->
+  <aside id="sidebar">
+ 
+    <!-- Sign to Text Sidebar -->
+    <div id="sidebar-stt" class="sidebar-view active">
+ 
+    <!-- Current Gesture -->
+    <div class="sidebar-section">
+      <div class="section-header">
+        <div class="section-title">Current Gesture</div>
+        <div id="analytics-status">
+          <div class="dot" id="analytics-dot"></div>
+          <span id="analytics-label">OFF</span>
+        </div>
+      </div>
+      <div id="gesture-detail">
+        <div id="gd-sign">WAITING...</div>
+        <div id="gd-desc">Present a hand gesture to the camera</div>
+        <div id="gd-conf">CONFIDENCE: —</div>
+        <div id="finger-states">
+          <div class="finger-pill" id="fp-thumb">THB</div>
+          <div class="finger-pill" id="fp-index">IDX</div>
+          <div class="finger-pill" id="fp-middle">MID</div>
+          <div class="finger-pill" id="fp-ring">RNG</div>
+          <div class="finger-pill" id="fp-pinky">PNK</div>
+        </div>
+      </div>
+    </div>
+ 
+    <!-- Vocabulary -->
+    <div class="sidebar-section">
+      <div class="section-header">
+        <div class="section-title">Vocabulary (20)</div>
+      </div>
+      <div id="vocab-grid"></div>
+    </div>
+ 
+    <!-- Interaction Log -->
+    <div class="section-header" style="padding:10px 16px 0;">
+      <div class="section-title">Interaction Log</div>
+      <span style="font-family:var(--font-mono);font-size:9px;color:var(--text-muted)" id="log-count">0 events</span>
+    </div>
+    <div id="history-list"></div>
+ 
+    <!-- Controls -->
+    <div class="ctrl-row">
+      <button class="btn primary" onclick="openConfigModal()">⚙ Analytics</button>
+      <button class="btn" onclick="exportLog()">↓ Export</button>
+      <button class="btn danger" onclick="clearLog()">✕ Clear</button>
+    </div>
+    </div>
+ 
+    <!-- Text to Sign Sidebar -->
+    <div id="sidebar-tts" class="sidebar-view" style="padding: 16px;">
+      <div class="section-title" style="margin-bottom: 16px;">Sign Library Dictionary</div>
+      <div id="dict-grid"></div>
+    </div>
+ 
+  </aside>
+</div>
+ 
+<script>
+// ══════════════════════════════════════════════════════════════════
+// SIGN LIBRARY - Mapping words to SigningSavvy GIF URLs
+// ══════════════════════════════════════════════════════════════════
+const SIGN_LIBRARY = {
+  // Greetings
+  'hello': 'https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExdjk2Ymd3aDFieDJ0dGkybnNnc3luZ3M4cDhwOW1oOTczbGZpeW9pMyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/WQgHGfa9NhwDwbOAOT/giphy.gif',
+  'hi': 'https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExdjk2Ymd3aDFieDJ0dGkybnNnc3luZ3M4cDhwOW1oOTczbGZpeW9pMyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/WQgHGfa9NhwDwbOAOT/giphy.gif',
+  'goodbye': 'https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExdjk2Ymd3aDFieDJ0dGkybnNnc3luZ3M4cDhwOW1oOTczbGZpeW9pMyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/WQgHGfa9NhwDwbOAOT/giphy.gif',
+  'bye': 'https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExdjk2Ymd3aDFieDJ0dGkybnNnc3luZ3M4cDhwOW1oOTczbGZpeW9pMyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/WQgHGfa9NhwDwbOAOT/giphy.gif',
+ 
+  // Polite
+  'please': 'https://giphy.com/gifs/Invest-In-Access-4uWrUWZRRoI7ttLnGh.gif',
+  'thank': 'https://giphy.com/gifs/CBeebiesHQ-thanks-mr-tumble-mister-EccEksNHtlbO7ibZjR.gif',
+  'you': 'https://giphy.com/gifs/simax-thank-you-sign-language-3s6MJXtehv1qx1K9zd.gif',
+  'thanks': 'https://giphy.com/gifs/CBeebiesHQ-thanks-mr-tumble-mister-EccEksNHtlbO7ibZjR',
+  'sorry': 'https://giphy.com/gifs/RgbPdsKuNkWbDCScZF',
+  'welcome': 'https://giphy.com/gifs/Invest-In-Access-3FPW0xwCHdKCQXhDWE',
+  
+  // Common
+  'help': 'https://giphy.com/gifs/signwithrobert-sign-with-robert-3oz8xxZjw8HJxLcmD6',
+  'friend': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExcmk3Znd5em9yY2RwNjVpYW9zeGkxZDQ5ejI5NWhqdXZiaHdlNm1vNiZlcD12MV9naWZzX3NlYXJjaCZjdD1n/3o7TKxJ9b7iHDWj0pa/giphy.gif',
+  'family': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExb3Z6Y29rajl0ZnJ5MjZrNGE3amtkNTI4eTgyanY4OHRiZWZtMHg2OSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/3o7TKoGpYpK5Gct9gA/giphy.gif',
+  'love': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExODNnbHZ2aW83YjlhZXhzbTZuejE3Y3ljZ2JldmRkb2thNmJpbXBudiZlcD12MV9naWZzX3NlYXJjaCZjdD1n/0Mh01I40M0WysPucyb/giphy.gif',
+  'happy': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExY2NvOWhmZ3l5a2JzOWcxeTJna2Z6endmMzFicWRhNXIzZDBmZmE5NiZlcD12MV9naWZzX3NlYXJjaCZjdD1n/eM1B6lU8rx33hz8GJj/giphy.gif',
+  'sad': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExc3hlZXFxOHl1dWVxc3dqcXQ0ZXlrOTF5d2lmOTNqMW1yamQ4bjJ1YSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/kh4qdwiREw6pRJk3u1/giphy.gif',
+  
+  // Questions
+  'yes': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExaDlhZzJoenlyejRlaDB2NXp4YTN2bjBzbmVubTRndGsxamN6OTd6MSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/ilyluIFwD2Et5X5hzF/giphy.gif',
+  'no': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExM3NreDZrZTFtbmlzdzhzZHpjM3VpMjB5NmR2aW45YjAwZnNiZ2dyMCZlcD12MV9naWZzX3NlYXJjaCZjdD1n/byN3PQPB7IRGDGEV65/giphy.gif',
+  'what': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExeXhucTVzYWl4NmF5Y29vbGF3cno0YXNlNzRjOXpwcXhtbnVxd2doZiZlcD12MV9naWZzX3NlYXJjaCZjdD1n/L3oSnHQmlnIMBdLcJX/giphy.gif',
+  'where': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNXF1cGp4OGJnMmhmYjY2Y3EyajNmMHhwcGRyNDk5ZWpud2ZlbWxieiZlcD12MV9naWZzX3NlYXJjaCZjdD1n/aCHulEM4XaDWtdxNQ1/giphy.gif',
+  'when': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNnRrd2ZtcTU1bHB5ZGd4ajQ0eDduMHB4bno1cWRqcXR5eXpzdzFwNyZlcD12MV9naWZzX3NlYXJjaCZjdD1n/tK0FgjZzKHcW2rjFv9/giphy.gif',
+  'how': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExcGYxZmFtMThleXhqdHludDJ2ZXJoOWIzOHpibHc3aWMxOXk2YnlhMyZlcD12MV9naWZzX3NlYXJjaCZjdD1n/L3oSnHQmlnIMBdLcJX/giphy.gif',
+  'why': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExN3NraW9heDc1NHd1NnYxZTJ0YjQ3N3Zybnlhc3J0YWdsOW5rMWJodCZlcD12MV9naWZzX3NlYXJjaCZjdD1n/U7nBGqrhw6dJeiWPWk/giphy.gif',
+  'who': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExcWN3OTY2Nm5vdHlmNDRtbGg0MnZ4c2VzZm9tbnFsY3BoOGxtOGpjayZlcD12MV9naWZzX3NlYXJjaCZjdD1n/w6LdJoiu52hReymsfA/giphy.gif',
+  
+  // Pronouns
+  'i': 'https://www.signingsavvy.com/media/mp4-ld/22/22507.mp4',
+  'me': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExcWN3OTY2Nm5vdHlmNDRtbGg0MnZ4c2VzZm9tbnFsY3BoOGxtOGpjayZlcD12MV9naWZzX3NlYXJjaCZjdD1n/w6LdJoiu52hReymsfA/giphy.gif',
+  'we': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExb2s3M2xnZW1zNWZtYXQ1bWxjY3k0MGszZmkyanhudzNkOG5nNXJreiZlcD12MV9naWZzX3NlYXJjaCZjdD1n/wDbm8rta6IxdAxngkG/giphy.gif',
+  'they': 'https://www.signingsavvy.com/media/mp4-ld/25/25815.mp4',
+  
+  // Verbs
+  'eat': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExZnZjZGl4eDI1OHlwMHAxenUwOXU1Nnd3MXVjZTg4ODNzczV6Z2M1YyZlcD12MV9naWZzX3NlYXJjaCZjdD1n/BK0isHNw806ElPaX1K/giphy.gif',
+  'drink': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNmZybTE5eXBieXZqc2Q0MHozcTJvanF1dDJ0bXphajF1YzlpYTV5OSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/YEcDsAyobbkOCTdkkF/giphy.gif',
+  'go': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExdjZscTBvbmwwdm5rMHN4MTR4ZGNkOTJjdGFlejYxY2I1Ym9tajZhOSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/l3vRdVMMN9VsW5a0w/giphy.gif',
+  'come': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExbDc2dTFzZjA2amJza2hzbnE2Mmxwdmxkd3kxOGZiNHRjN3JxcXExdSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/G2DUbqYSYhbeTYfkJN/giphy.gif',
+  'want': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExMnJ1bGdiYm9mdGRjN2kxZmJkdnV6dzlnbWE5dHNhcmJ0cmo3N2V0MCZlcD12MV9naWZzX3NlYXJjaCZjdD1n/SFDEGDClqXSuZpELVz/giphy.gif',
+  'need': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExMW1kZGR3dzc2NGV4bHZsZGtyYnp2ZDF2dW1naW02MjY0emZhcDdhNiZlcD12MV9naWZzX3NlYXJjaCZjdD1n/HICKx1J6uINg02duvm/giphy.gif',
+  'know': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNTljbGF1M3UzY2I2ZXJzcTh4ZzBjN3FoNGZjamZsdHF0Z2g5bnB5NiZlcD12MV9naWZzX3NlYXJjaCZjdD1n/WkPGqzW7GLJENMAr7C/giphy.gif',
+  'understand': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExODMxOTI4ajl4Z2cwMXd6aXpoYzZuZWVkZHZhZ3k1cnp3a2JnMTNtZyZlcD12MV9naWZzX3NlYXJjaCZjdD1n/MZDsWYlqhPkoLMAKpH/giphy.gif',
+  'have': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExdWtqdGRlOTlwMTAzMWd6dTkzMWl1Mzh3NzRjaHYzdjg0aGQ2NzhqcCZlcD12MV9naWZzX3NlYXJjaCZjdD1n/gDew8VSfx5BxMFSqXm/giphy.gif',
+  'make': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExcjJzMzJnYTg0a3Y0em1zdzgzdnB5aWVpYXM5NjF5MGt3NHE1b3UydyZlcD12MV9naWZzX3NlYXJjaCZjdD1n/HICKx1J6uINg02duvm/giphy.gif',
+  'see': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExYnJ6cG9lczZoNTh3d2VyeGxtM2tuZDZ2dml0ZTNlMmc1dTBxNGU5OSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/TvMmgfpnNboM8R0Sjw/giphy.gif',
+  
+  // Places
+  'home': 'https://www.signingsavvy.com/media/mp4-ld/28/28833.mp4',
+  'work': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExcXFtd25kbzV1c2owMWd6YXJ3YnVzZ2FzdzI1eW1xZjJkaWtobzVqdiZlcD12MV9naWZzX3NlYXJjaCZjdD1n/rN4CGAbc6SiHdVzVRz/giphy.gif',
+  'school': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExZXo0b2MyeGVkemlnb3lja3lyMjZ4Z3dqYjBnZDVydzU2b3RrN2dkbiZlcD12MV9naWZzX3NlYXJjaCZjdD1n/ZdcGrjRkNCnz7yreLR/giphy.gif',
+  'hospital': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExeHpheDk5Y2YzcXB0bjhnd3Z2c2JnOGl3dTBkOHA3cGEwNWIxdXVmdyZlcD12MV9naWZzX3NlYXJjaCZjdD1n/1z9O4jIesLYp5ZI5BL/giphy.gif',
+  'bathroom': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExMXo4YmtkY2JqM3J0aHAzZXhidms1cTVicnB6cGQ4MHp5bGx2NzJ0aCZlcD12MV9naWZzX3NlYXJjaCZjdD1n/26DONjlzKa7fM9HUI/giphy.gif',
+  'restroom': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExZ2Ruenk1MTRyZDk3dzJqbWd4YWM4cjQ4MmUzb2YzcWFxeXJoZGM4NiZlcD12MV9naWZzX3NlYXJjaCZjdD1n/m3sTbIg4yCo0YtcH1x/giphy.gif',
+  
+  // Things
+  'food': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExM3U3c25sN3owcTQycnBjaHU2cm9xMnF4NjF4bWNnNHY2bmkzMGxpbSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/26DOtLVBDesaOnTJm/giphy.gif',
+  'water': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExbGV3dm05Nm94Z3pieWRxMmtsbzJueGt4bXN2cTB1dmY2bGp2OTI4ZyZlcD12MV9naWZzX3NlYXJjaCZjdD1n/xT1R9C9N33MQdrUORi/giphy.gif',
+  
+  // Time
+  'today': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExcm5rMWl1ZnB5bDB5MTdzaWJpdWhnN29pNWpueHV0c25lcXZ0Y25lcCZlcD12MV9naWZzX3NlYXJjaCZjdD1n/nNgXbTD90VaLBo8Y7H/giphy.gif',
+  'tomorrow': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExYWg5cHQ4NWl2ZG40cTVqbzk3a3V0engzdWtjZ3Z0MWdlNTEzdGpuayZlcD12MV9naWZzX3NlYXJjaCZjdD1n/fUXfHSCTDAKGqXm9et/giphy.gif',
+  'now': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExdHA2bmt0NXlwa2o2YTU4c3pndDd5YjNsNDV6bzV1NHliNmF4ajlibSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/mVMCS5JRjwuLttKu0h/giphy.gif',
+  
+  // Feelings
+  'good': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExdWF2NnI5bWl6YTZ2aXdudDI4and3MmU4aGVsZHk5aW41bTBpa3RsZSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/IvEnAMIAtJpIf8qomA/giphy.gif',
+  'bad': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExd2J0N3V0Y25lcXZ0Y25lcCZlcD12MV9naWZzX3NlYXJjaCZjdD1n/1z9O4jIesLYp5ZI5BL/giphy.gif',
+  'ok': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExMjF4ZWNkZzB0cmZzY3J6ZXo1dDFsaXI1aTVwOWpmZG1hbnFuamFyaiZlcD12MV9naWZzX3NlYXJjaCZjdD1n/pCjzVbpLw2V7lmuWK5/giphy.gif',
+  'okay': 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExMjF4ZWNkZzB0cmZzY3J6ZXo1dDFsaXI1aTVwOWpmZG1hbnFuamFyaiZlcD12MV9naWZzX3NlYXJjaCZjdD1n/pCjzVbpLw2V7lmuWK5/giphy.gif',
+  
+  // More common words
+  'and': 'https://www.signingsavvy.com/media/mp4-ld/20/20092.mp4',
+  'or': 'https://www.signingsavvy.com/media/mp4-ld/23/23802.mp4',
+  'the': 'https://www.signingsavvy.com/media/mp4-ld/25/25820.mp4',
+  'is': 'https://www.signingsavvy.com/media/mp4-ld/22/22595.mp4',
+  'are': 'https://www.signingsavvy.com/media/mp4-ld/20/20132.mp4',
+  'be': 'https://www.signingsavvy.com/media/mp4-ld/20/20264.mp4',
+  'can': 'https://www.signingsavvy.com/media/mp4-ld/20/20645.mp4',
+  'will': 'https://www.signingsavvy.com/media/mp4-ld/28/28694.mp4',
+  'do': 'https://www.signingsavvy.com/media/mp4-ld/21/21533.mp4',
+  'not': 'https://www.signingsavvy.com/media/mp4-ld/23/23726.mp4'
+};
+ 
+/* ── VOCABULARY ── */
+const VOCABULARY = [
+  {
+    name: 'READY',
+    description: 'All fingers extended — signalling readiness to begin a task',
+    detect: ({ fingers }) =>
+      fingers.thumb && fingers.index && fingers.middle && fingers.ring && fingers.pinky ? 0.92 : 0
+  },
+  {
+    name: 'HELP',
+    description: 'Thumb extended, fist closed — requesting assistance',
+    detect: ({ fingers }) =>
+      fingers.thumb && !fingers.index && !fingers.middle && !fingers.ring && !fingers.pinky ? 0.88 : 0
+  },
+  {
+    name: 'STOP',
+    description: 'Open palm facing forward — halt current operation',
+    detect: ({ fingers, lm }) => {
+      const allExtended = fingers.index && fingers.middle && fingers.ring && fingers.pinky;
+      const palmFacing = lm[0].y > lm[9].y;
+      return allExtended && palmFacing ? 0.91 : 0;
+    }
+  },
+  {
+    name: 'YES',
+    description: 'Closed fist — confirming / agreeing',
+    detect: ({ fingers }) =>
+      !fingers.thumb && !fingers.index && !fingers.middle && !fingers.ring && !fingers.pinky ? 0.85 : 0
+  },
+  {
+    name: 'NO',
+    description: 'Index and middle finger crossed / together — negation',
+    detect: ({ fingers, dist }) =>
+      fingers.index && fingers.middle && !fingers.ring && !fingers.pinky && dist.indexMiddle < 0.04 ? 0.82 : 0
+  },
+  {
+    name: 'START',
+    description: 'Index finger pointing up — initiate process',
+    detect: ({ fingers }) =>
+      !fingers.thumb && fingers.index && !fingers.middle && !fingers.ring && !fingers.pinky ? 0.87 : 0
+  },
+  {
+    name: 'FINISHED',
+    description: 'Waving open hand — task complete',
+    detect: ({ fingers, dist }) => {
+      const allFour = fingers.index && fingers.middle && fingers.ring && fingers.pinky;
+      return allFour && !fingers.thumb && dist.thumbIndex > 0.12 ? 0.83 : 0;
+    }
+  },
+  {
+    name: 'BREAK',
+    description: 'L-shape (thumb + index) — requesting a break',
+    detect: ({ fingers }) =>
+      fingers.thumb && fingers.index && !fingers.middle && !fingers.ring && !fingers.pinky ? 0.86 : 0
+  },
+  {
+    name: 'DANGER',
+    description: 'Crossed index fingers — safety hazard alert',
+    detect: ({ fingers, dist }) =>
+      fingers.index && !fingers.middle && !fingers.ring && !fingers.pinky && dist.thumbIndex < 0.05 ? 0.80 : 0
+  },
+  {
+    name: 'THANK YOU',
+    description: 'Flat hand from chin forward — gratitude',
+    detect: ({ fingers, lm }) => {
+      const allExtended = fingers.index && fingers.middle && fingers.ring && fingers.pinky;
+      const handLow = lm[0].y > 0.5;
+      return allExtended && !fingers.thumb && handLow ? 0.78 : 0;
+    }
+  },
+  {
+    name: 'PLEASE',
+    description: 'Circular motion on chest — polite request',
+    detect: ({ fingers, dist }) => {
+      const threeExtended = fingers.index && fingers.middle && fingers.ring;
+      return threeExtended && !fingers.pinky && dist.thumbIndex > 0.08 ? 0.79 : 0;
+    }
+  },
+  {
+    name: 'EMERGENCY',
+    description: '⚠ All fingers spread wide — critical emergency signal',
+    detect: ({ fingers, dist }) => {
+      const allExtended = fingers.thumb && fingers.index && fingers.middle && fingers.ring && fingers.pinky;
+      const wideSpread = dist.thumbPinky > 0.35;
+      return allExtended && wideSpread ? 0.95 : 0;
+    }
+  },
+  {
+    name: 'QUESTION',
+    description: 'Index finger curled — asking a question',
+    detect: ({ fingers, dist }) =>
+      !fingers.index && !fingers.middle && !fingers.ring && !fingers.pinky && dist.thumbIndex > 0.05 ? 0.84 : 0
+  },
+  {
+    name: 'MEETING',
+    description: 'Two hands clasped — requesting a meeting',
+    detect: ({ fingers, dist }) => {
+      const twoFingers = fingers.index && fingers.middle && !fingers.ring && !fingers.pinky;
+      return twoFingers && !fingers.thumb && dist.indexMiddle > 0.05 ? 0.81 : 0;
+    }
+  },
+  {
+    name: 'LUNCH',
+    description: 'Fingers pinched to mouth — mealtime signal',
+    detect: ({ fingers, dist }) =>
+      dist.thumbIndex < 0.04 && !fingers.middle && !fingers.ring && !fingers.pinky ? 0.82 : 0
+  },
+  {
+    name: 'WORK',
+    description: 'Fist tapping motion — back to work signal',
+    detect: ({ fingers, dist }) =>
+      !fingers.index && !fingers.middle && !fingers.ring && !fingers.pinky && dist.thumbIndex < 0.06 ? 0.83 : 0
+  },
+  {
+    name: 'NOW',
+    description: 'Index pointing down — immediate action required',
+    detect: ({ fingers, lm }) => {
+      const onlyIndex = fingers.index && !fingers.middle && !fingers.ring && !fingers.pinky;
+      const pointingDown = lm[8].y > lm[6].y;
+      return onlyIndex && pointingDown ? 0.80 : 0;
+    }
+  },
+  {
+    name: 'LATER',
+    description: 'Pinky extended — defer / schedule for later',
+    detect: ({ fingers }) =>
+      !fingers.thumb && !fingers.index && !fingers.middle && !fingers.ring && fingers.pinky ? 0.85 : 0
+  },
+  {
+    name: 'OKAY',
+    description: 'OK pinch (thumb + index circle) — acknowledged / approved',
+    detect: ({ fingers, dist }) => {
+      const pinchOK = dist.thumbIndex < 0.05;
+      const othersExtended = fingers.middle && fingers.ring && fingers.pinky;
+      return pinchOK && othersExtended ? 0.90 : 0;
+    }
+  },
+  {
+    name: 'CLEAR',
+    description: 'Sweeping open hand — clear workspace / reset',
+    detect: ({ fingers, dist }) => {
+      const fourExtended = fingers.index && fingers.middle && fingers.ring && fingers.pinky;
+      return fourExtended && fingers.thumb && dist.thumbPinky > 0.28 && dist.thumbPinky < 0.35 ? 0.86 : 0;
+    }
+  }
+];
+ 
+const GESTURE_MAP = Object.fromEntries(VOCABULARY.map(v => [v.name, v]));
+ 
+const LM = {
+  WRIST: 0,
+  THUMB_CMC: 1, THUMB_MCP: 2, THUMB_IP: 3, THUMB_TIP: 4,
+  INDEX_MCP: 5, INDEX_PIP: 6, INDEX_DIP: 7, INDEX_TIP: 8,
+  MIDDLE_MCP: 9, MIDDLE_PIP: 10, MIDDLE_DIP: 11, MIDDLE_TIP: 12,
+  RING_MCP: 13, RING_PIP: 14, RING_DIP: 15, RING_TIP: 16,
+  PINKY_MCP: 17, PINKY_PIP: 18, PINKY_DIP: 19, PINKY_TIP: 20
+};
+ 
+const state = {
+  lastSpokenSign: null,
+  lastSpeechTime: 0,
+  speechDebounceMs: 1500,
+  sessionStart: Date.now(),
+  totalSigns: 0,
+  confidenceSum: 0,
+  handsVisible: 0,
+  analyticsLog: [],
+  sheetsEndpoint: localStorage.getItem('sb_sheets_url') || '',
+  sessionId: localStorage.getItem('sb_session_id') || generateSessionId(),
+  speechEnabled: 'speechSynthesis' in window,
+  running: false
+};
+ 
+function euclidean(a, b) {
+  return Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2));
+}
+ 
+function isExtended(tip, pip) {
+  return tip.y < pip.y;
+}
+ 
+function isThumbExtended(landmarks, handedness) {
+  const tip = landmarks[LM.THUMB_TIP];
+  const mcp = landmarks[LM.THUMB_MCP];
+  return handedness === 'Right' ? tip.x < mcp.x : tip.x > mcp.x;
+}
+ 
+function generateSessionId() {
+  const id = 'SB-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+  localStorage.setItem('sb_session_id', id);
+  return id;
+}
+ 
+function formatTime(ms) {
+  const s = Math.floor(ms / 1000);
+  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+}
+ 
+function showToast(msg, color = 'rgba(255,255,255,0.15)') {
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.style.borderColor = color;
+  el.textContent = msg;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+ 
+const CONFIDENCE_THRESHOLD = 0.75;
+ 
+function analyzeGesture(landmarks, handedness) {
+  const fingers = {
+    thumb:  isThumbExtended(landmarks, handedness),
+    index:  isExtended(landmarks[LM.INDEX_TIP],  landmarks[LM.INDEX_PIP]),
+    middle: isExtended(landmarks[LM.MIDDLE_TIP], landmarks[LM.MIDDLE_PIP]),
+    ring:   isExtended(landmarks[LM.RING_TIP],   landmarks[LM.RING_PIP]),
+    pinky:  isExtended(landmarks[LM.PINKY_TIP],  landmarks[LM.PINKY_PIP])
+  };
+ 
+  const dist = {
+    thumbIndex:  euclidean(landmarks[LM.THUMB_TIP],  landmarks[LM.INDEX_TIP]),
+    indexMiddle: euclidean(landmarks[LM.INDEX_TIP],  landmarks[LM.MIDDLE_TIP]),
+    thumbPinky:  euclidean(landmarks[LM.THUMB_TIP],  landmarks[LM.PINKY_TIP]),
+    ringPinky:   euclidean(landmarks[LM.RING_TIP],   landmarks[LM.PINKY_TIP]),
+    thumbMiddle: euclidean(landmarks[LM.THUMB_TIP],  landmarks[LM.MIDDLE_TIP])
+  };
+ 
+  const ctx = { fingers, dist, lm: landmarks, handedness };
+ 
+  let bestMatch = null;
+  let bestConf = CONFIDENCE_THRESHOLD;
+ 
+  for (const gesture of VOCABULARY) {
+    const conf = gesture.detect(ctx);
+    if (conf > bestConf) {
+      bestConf = conf;
+      bestMatch = gesture.name;
+    }
+  }
+ 
+  return bestMatch ? { sign: bestMatch, confidence: bestConf, fingers, dist } : null;
+}
+ 
+async function logToAnalytics(signName, confidence) {
+  const entry = {
+    sessionId:   state.sessionId,
+    signName,
+    confidence:  (confidence * 100).toFixed(1) + '%',
+    timestamp:   new Date().toISOString(),
+    userAgent:   navigator.userAgent.slice(0, 80)
+  };
+ 
+  state.analyticsLog.push(entry);
+ 
+  if (state.sheetsEndpoint) {
+    try {
+      await fetch(state.sheetsEndpoint, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(entry)
+      });
+      updateAnalyticsDot('active');
+    } catch (err) {
+      console.warn('[SignBridge Analytics] POST failed:', err.message);
+      updateAnalyticsDot('warn');
+    }
+  }
+}
+ 
+function updateAnalyticsDot(status) {
+  document.getElementById('analytics-dot').className = 'dot ' + status;
+}
+ 
+function exportLog() {
+  if (!state.analyticsLog.length) { showToast('⚠ No log data to export', 'rgba(245,158,11,0.5)'); return; }
+  const blob = new Blob([JSON.stringify(state.analyticsLog, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `signbridge-session-${state.sessionId}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('✓ Log exported: ' + state.analyticsLog.length + ' events', 'rgba(16,185,129,0.4)');
+}
+ 
+function clearLog() {
+  state.analyticsLog = [];
+  document.getElementById('history-list').innerHTML = '';
+  document.getElementById('log-count').textContent = '0 events';
+  showToast('Log cleared');
+}
+ 
+function speakSign(signName) {
+  if (!state.speechEnabled) return;
+  const now = Date.now();
+  if (signName === state.lastSpokenSign && (now - state.lastSpeechTime) < state.speechDebounceMs) return;
+  state.lastSpokenSign = signName;
+  state.lastSpeechTime = now;
+  const utterance = new SpeechSynthesisUtterance(signName.toLowerCase());
+  utterance.rate = 0.95;
+  utterance.pitch = 1.0;
+  utterance.volume = 0.9;
+  const voices = window.speechSynthesis.getVoices();
+  const preferredVoice = voices.find(v => v.lang.startsWith('en') && v.name.includes('Google')) ||
+                         voices.find(v => v.lang.startsWith('en')) || null;
+  if (preferredVoice) utterance.voice = preferredVoice;
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(utterance);
+}
+ 
+function updateCurrentSign(signName, confidence, fingers) {
+  const signEl = document.getElementById('current-sign');
+  signEl.textContent = signName || '—';
+  signEl.className = signName === 'EMERGENCY' ? 'emergency' : signName ? '' : 'idle';
+ 
+  const pct = signName ? Math.round(confidence * 100) : 0;
+  document.getElementById('confidence-fill').style.width = pct + '%';
+  document.getElementById('conf-pct').textContent = pct + '%';
+ 
+  const gd = document.getElementById('gesture-detail');
+  if (signName) {
+    gd.classList.add('active');
+    document.getElementById('gd-sign').textContent = signName;
+    document.getElementById('gd-desc').textContent = GESTURE_MAP[signName]?.description || '';
+    document.getElementById('gd-conf').textContent = `CONFIDENCE: ${pct}%`;
+  } else {
+    gd.classList.remove('active');
+    document.getElementById('gd-sign').textContent = 'WAITING...';
+    document.getElementById('gd-desc').textContent = 'Present a hand gesture to the camera';
+    document.getElementById('gd-conf').textContent = 'CONFIDENCE: —';
+  }
+ 
+  if (fingers) {
+    const names = ['thumb', 'index', 'middle', 'ring', 'pinky'];
+    const ids   = ['fp-thumb', 'fp-index', 'fp-middle', 'fp-ring', 'fp-pinky'];
+    names.forEach((f, i) => {
+      document.getElementById(ids[i]).classList.toggle('extended', !!fingers[f]);
+    });
+  }
+ 
+  document.querySelectorAll('.vocab-chip').forEach(chip => {
+    chip.classList.toggle('detected', chip.dataset.sign === signName);
+  });
+}
+ 
+function addHistoryEntry(signName, confidence) {
+  const list = document.getElementById('history-list');
+  const entry = document.createElement('div');
+  const isEmerg = signName === 'EMERGENCY';
+  entry.className = 'history-entry' + (isEmerg ? ' emerg' : '');
+  const time = new Date().toLocaleTimeString('en-GB', { hour12: false });
+  entry.innerHTML = `
+    <span class="sign-tag">${signName}</span>
+    <span class="conf-tag">${Math.round(confidence * 100)}%</span>
+    <span class="time-tag">${time}</span>
+  `;
+  list.insertBefore(entry, list.firstChild);
+  if (list.children.length > 50) list.removeChild(list.lastChild);
+  document.getElementById('log-count').textContent = state.analyticsLog.length + ' events';
+}
+ 
+function updateMetrics() {
+  document.getElementById('m-total').textContent = state.totalSigns;
+  document.getElementById('m-time').textContent = formatTime(Date.now() - state.sessionStart);
+  document.getElementById('m-hands').textContent = state.handsVisible;
+  if (state.totalSigns > 0) {
+    document.getElementById('m-avgconf').textContent =
+      Math.round((state.confidenceSum / state.totalSigns) * 100) + '%';
+  }
+}
+ 
+const videoEl  = document.getElementById('input-video');
+const canvasEl = document.getElementById('output-canvas');
+const canvasCtx = canvasEl.getContext('2d');
+ 
+const LANDMARK_STYLE = {
+  color:      'rgba(168,85,247,0.9)',
+  fillColor:  'rgba(168,85,247,0.3)',
+  lineWidth:  2,
+  radius:     4
+};
+ 
+const CONNECTOR_STYLE = {
+  color:     'rgba(168,85,247,0.45)',
+  lineWidth: 1.5
+};
+ 
+function onResults(results) {
+  canvasEl.width  = videoEl.videoWidth;
+  canvasEl.height = videoEl.videoHeight;
+  canvasCtx.save();
+  canvasCtx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+  state.handsVisible = results.multiHandLandmarks ? results.multiHandLandmarks.length : 0;
+ 
+  if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+    for (let i = 0; i < results.multiHandLandmarks.length; i++) {
+      const landmarks  = results.multiHandLandmarks[i];
+      const handedness = results.multiHandedness?.[i]?.label || 'Right';
+      drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, CONNECTOR_STYLE);
+      drawLandmarks(canvasCtx, landmarks, LANDMARK_STYLE);
+ 
+      if (i === 0) {
+        const result = analyzeGesture(landmarks, handedness);
+        if (result) {
+          const { sign, confidence, fingers } = result;
+          updateCurrentSign(sign, confidence, fingers);
+          const now = Date.now();
+          if (sign !== state.lastSpokenSign || (now - state.lastSpeechTime) >= state.speechDebounceMs) {
+            speakSign(sign);
+            state.totalSigns++;
+            state.confidenceSum += confidence;
+            addHistoryEntry(sign, confidence);
+            logToAnalytics(sign, confidence);
+          }
+        } else {
+          updateCurrentSign(null, 0, null);
+        }
+      }
+    }
+  } else {
+    updateCurrentSign(null, 0, null);
+  }
+ 
+  canvasCtx.restore();
+  updateMetrics();
+}
+ 
+function initMediaPipe() {
+  const hands = new Hands({
+    locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+  });
+ 
+  hands.setOptions({
+    maxNumHands:            2,
+    modelComplexity:        1,
+    minDetectionConfidence: 0.7,
+    minTrackingConfidence:  0.6
+  });
+ 
+  hands.onResults(onResults);
+  setStatus('mp-dot', 'mp-status', 'active', 'MEDIAPIPE READY');
+ 
+  const camera = new Camera(videoEl, {
+    onFrame: async () => { await hands.send({ image: videoEl }); },
+    width: 1280,
+    height: 720
+  });
+ 
+  camera.start().then(() => {
+    setStatus('cam-dot', 'cam-status', 'active', 'CAMERA ACTIVE');
+    document.getElementById('rec-badge').classList.add('live');
+    state.running = true;
+  }).catch(err => {
+    setStatus('cam-dot', 'cam-status', 'error', 'CAMERA ERROR');
+    showToast('⚠ Camera access denied. Please allow camera permission.', 'rgba(244,63,94,0.5)');
+    console.error('[SignBridge Camera]', err);
+  });
+}
+ 
+function setStatus(dotId, labelId, dotClass, labelText) {
+  document.getElementById(dotId).className = 'dot ' + dotClass;
+  document.getElementById(labelId).textContent = labelText;
+}
+ 
+function openConfigModal() {
+  document.getElementById('sheets-url-input').value = state.sheetsEndpoint;
+  document.getElementById('session-id-input').value = state.sessionId;
+  document.getElementById('config-modal').classList.add('open');
+}
+ 
+function closeConfigModal() {
+  document.getElementById('config-modal').classList.remove('open');
+}
+ 
+function saveConfig() {
+  const url = document.getElementById('sheets-url-input').value.trim();
+  state.sheetsEndpoint = url;
+  localStorage.setItem('sb_sheets_url', url);
+  closeConfigModal();
+  if (url) {
+    updateAnalyticsDot('active');
+    document.getElementById('analytics-label').textContent = 'ON';
+    showToast('✓ Analytics endpoint saved', 'rgba(16,185,129,0.4)');
+  } else {
+    updateAnalyticsDot('');
+    document.getElementById('analytics-label').textContent = 'OFF';
+    showToast('Analytics endpoint cleared');
+  }
+}
+ 
+function renderVocabGrid() {
+  const grid = document.getElementById('vocab-grid');
+  VOCABULARY.forEach(v => {
+    const chip = document.createElement('div');
+    chip.className = 'vocab-chip' + (v.name === 'EMERGENCY' ? ' emergency' : '');
+    chip.dataset.sign = v.name;
+    chip.textContent = v.name;
+    chip.title = v.description;
+    grid.appendChild(chip);
+  });
+}
+ 
+function startClock() {
+  setInterval(() => {
+    document.getElementById('sys-clock').textContent =
+      new Date().toLocaleTimeString('en-GB', { hour12: false });
+  }, 1000);
+}
+ 
+const LOAD_MESSAGES = [
+  'INITIALIZING MEDIAPIPE HANDS ENGINE...',
+  'LOADING GESTURE RECOGNITION MODELS...',
+  'CONFIGURING VOICE OUTPUT MODULE...',
+  'PREPARING COMMAND CENTER UI...',
+  'SYSTEM READY.'
+];
+ 
+function bootSequence() {
+  const statusEl = document.getElementById('load-status');
+  let step = 0;
+  const interval = setInterval(() => {
+    step++;
+    if (step < LOAD_MESSAGES.length) statusEl.textContent = LOAD_MESSAGES[step];
+    else clearInterval(interval);
+  }, 600);
+  setTimeout(() => {
+    document.getElementById('loading-screen').classList.add('hidden');
+  }, 3200);
+}
+ 
+function checkSpeechAPI() {
+  if ('speechSynthesis' in window) {
+    setStatus('speech-dot', 'speech-status', 'active', 'SPEECH READY');
+    window.speechSynthesis.getVoices();
+    window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+  } else {
+    setStatus('speech-dot', 'speech-status', 'error', 'UNAVAIL');
+  }
+}
+ 
+function initAnalyticsIndicator() {
+  if (state.sheetsEndpoint) {
+    updateAnalyticsDot('active');
+    document.getElementById('analytics-label').textContent = 'ON';
+  }
+}
+ 
+function setMode(mode) {
+  if (mode === 'stt') {
+    document.getElementById('mode-stt-btn').classList.add('active');
+    document.getElementById('mode-tts-btn').classList.remove('active');
+    document.getElementById('panel-stt').classList.add('active');
+    document.getElementById('panel-tts').classList.remove('active');
+    document.getElementById('sidebar-stt').classList.add('active');
+    document.getElementById('sidebar-tts').classList.remove('active');
+  } else {
+    document.getElementById('mode-tts-btn').classList.add('active');
+    document.getElementById('mode-stt-btn').classList.remove('active');
+    document.getElementById('panel-tts').classList.add('active');
+    document.getElementById('panel-stt').classList.remove('active');
+    document.getElementById('sidebar-tts').classList.add('active');
+    document.getElementById('sidebar-stt').classList.remove('active');
+  }
+}
+ 
+function playLibrarySign(word) {
+  const url = SIGN_LIBRARY[word];
+  const isVideo = url.endsWith('.mp4');
+  const videoEl = document.getElementById('tts-media');
+  const imgEl = document.getElementById('tts-media-img');
+  const labelEl = document.getElementById('tts-word-label');
+  const placeholder = document.getElementById('tts-placeholder');
+  
+  placeholder.style.display = 'none';
+  labelEl.textContent = word.toUpperCase();
+  labelEl.style.display = 'block';
+ 
+  if (isVideo) {
+    imgEl.style.display = 'none';
+    videoEl.src = url;
+    videoEl.style.display = 'block';
+    videoEl.play().catch(e => console.log('Autoplay prevented:', e));
+  } else {
+    videoEl.style.display = 'none';
+    videoEl.pause();
+    imgEl.src = url;
+    imgEl.style.display = 'block';
+  }
+ 
+  document.querySelectorAll('.dict-btn').forEach(btn => btn.classList.remove('active-word'));
+  const activeBtn = document.querySelector(`.dict-btn[data-word="${word}"]`);
+  if (activeBtn) activeBtn.classList.add('active-word');
+}
+ 
+function renderSignLibraryWords() {
+  const grid = document.getElementById('dict-grid');
+  Object.keys(SIGN_LIBRARY).sort().forEach(word => {
+    const btn = document.createElement('button');
+    btn.className = 'dict-btn';
+    btn.dataset.word = word;
+    btn.textContent = word.toUpperCase();
+    btn.onclick = () => playLibrarySign(word);
+    grid.appendChild(btn);
+  });
+}
+ 
+window.addEventListener('DOMContentLoaded', () => {
+  bootSequence();
+  renderVocabGrid();
+  renderSignLibraryWords();
+  startClock();
+  checkSpeechAPI();
+  initAnalyticsIndicator();
+  setTimeout(initMediaPipe, 1200);
+});
+</script>
+</body>
+</html>
